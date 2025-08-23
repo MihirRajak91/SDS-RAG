@@ -1,24 +1,42 @@
 """
-Financial number parsing and data type conversion utilities.
-Handles various financial number formats, currencies, and data validation.
+Financial Number Parsing Service - Microservice for parsing financial data formats.
+
+This module provides comprehensive parsing and processing of financial data formats
+commonly found in PDF documents. It handles number conversion, intelligent header
+detection, and DataFrame construction with financial data type awareness.
+
+Key Features:
+- Multi-format financial number parsing (currency, percentages, magnitudes)
+- Intelligent header row detection using financial keyword analysis
+- Automatic numeric column detection and conversion
+- DataFrame creation with proper data types
+- Support for various financial notation formats (parentheses for negatives, etc.)
+
+Classes:
+    FinancialNumberParsingService: Core number parsing and conversion
+    HeaderProcessingService: Intelligent table header detection
+    DataFrameService: DataFrame creation and type management
+
 """
 
 import re
 import pandas as pd
 import logging
-from typing import Union, Optional, List, Dict
+from typing import Union, List, Tuple
 from decimal import Decimal, InvalidOperation
+
+from src.models.schemas import HeaderRow, TableData
 
 logger = logging.getLogger(__name__)
 
-class FinancialNumberParser:
-    """Parser for financial numbers in various formats"""
+class FinancialNumberParsingService:
+    """Service for parsing financial numbers in various formats"""
     
     def __init__(self):
         # Currency symbols pattern
         self.currency_pattern = r'^[\$€£¥₹]'
         
-        # Common financial dash representations for zero/null
+        # Common financial null values
         self.null_values = {
             '—', '–', '-', 'n/a', 'N/A', 'n.a.', 'N.A.', 'na', 'NA', 
             'nil', 'Nil', 'NULL', 'null', '', ' '
@@ -31,58 +49,69 @@ class FinancialNumberParser:
             'b': 1_000_000_000, 'B': 1_000_000_000,
             't': 1_000_000_000_000, 'T': 1_000_000_000_000
         }
+        
+        logger.info("Financial number parsing service initialized")
     
     def is_financial_number(self, value: str) -> bool:
-        """Check if a string represents a financial number"""
+        """
+        Check if a string represents a financial number.
+        
+        Args:
+            value (str): String to check
+            
+        Returns:
+            bool: True if string represents a financial number, False otherwise
+        """
         if not value or not isinstance(value, str):
             return False
         
         value = value.strip()
-        
-        if not value:
-            return False
-        
-        # Handle null values
-        if value in self.null_values:
+        if not value or value in self.null_values:
             return True
         
-        # Remove currency symbols and clean
+        # Remove currency and clean
         clean_value = re.sub(self.currency_pattern, '', value).strip()
         
-        # Handle parentheses for negatives
+        # Handle parentheses
         if clean_value.startswith('(') and clean_value.endswith(')'):
             clean_value = clean_value[1:-1]
         
-        # Remove commas, spaces, and percentage signs
+        # Remove formatting
         clean_value = re.sub(r'[,\s%]', '', clean_value)
         
-        # Check for number patterns with optional magnitude suffix
+        # Check patterns
         patterns = [
-            r'^-?\d+(\.\d+)?[MBKTmkbt]?$',  # Standard numbers with magnitude
-            r'^\d{1,3}(,\d{3})*(\.\d+)?$',  # Comma-separated numbers
+            r'^-?\d+(\.\d+)?[MBKTmkbt]?$',  # With magnitude
+            r'^\d{1,3}(,\d{3})*(\.\d+)?$',  # Comma-separated
             r'^\d+$',                       # Simple integers
             r'^\d*\.\d+$'                   # Decimals
         ]
         
         return any(re.match(pattern, clean_value, re.IGNORECASE) for pattern in patterns)
     
-    def parse_financial_number(self, value: Union[str, int, float]) -> Optional[float]:
-        """Parse financial number string to float"""
+    def parse_financial_number(self, value: Union[str, int, float]) -> float:
+        """
+        Parse financial number string to float.
+        
+        Args:
+            value (Union[str, int, float]): Value to parse
+            
+        Returns:
+            float: Parsed financial number
+        """
         if pd.isna(value) or value is None:
             return pd.NA
         
-        # Handle already numeric values
         if isinstance(value, (int, float)):
             return float(value)
         
         value_str = str(value).strip()
         
-        # Handle null values
         if value_str.lower() in {v.lower() for v in self.null_values}:
             return 0.0
         
         try:
-            # Track if number is negative (parentheses)
+            # Track negative (parentheses)
             is_negative = False
             if value_str.startswith('(') and value_str.endswith(')'):
                 value_str = value_str[1:-1]
@@ -106,20 +135,16 @@ class FinancialNumberParser:
                 multiplier = self.magnitude_multipliers[suffix]
                 clean_value = clean_value[:-1]
             
-            # Parse the base number
             if not clean_value:
                 return 0.0
             
             try:
                 number = float(clean_value) * multiplier
-                
                 if is_percentage:
                     number = number / 100
-                
                 return -number if is_negative else number
                 
             except ValueError:
-                # Try with Decimal for high precision
                 try:
                     number = float(Decimal(clean_value)) * multiplier
                     if is_percentage:
@@ -134,31 +159,44 @@ class FinancialNumberParser:
             return pd.NA
     
     def detect_numeric_columns(self, df: pd.DataFrame, threshold: float = 0.6) -> List[str]:
-        """Detect columns that contain mostly financial numbers"""
+        """
+        Detect columns that contain mostly financial numbers.
+        
+        Args:
+            df (pd.DataFrame): DataFrame to detect numeric columns
+            threshold (float): Threshold for financial number detection (default: 0.6)
+            
+        Returns:
+            List[str]: List of numeric columns
+        """
         numeric_columns = []
         
         for col in df.columns:
             if df[col].empty:
                 continue
             
-            # Sample non-null values
             sample_values = df[col].dropna().astype(str).head(10)
             if len(sample_values) == 0:
                 continue
             
-            # Count financial numbers
             financial_count = sum(1 for val in sample_values if self.is_financial_number(val))
             
-            # If majority are financial numbers, mark as numeric column
             if financial_count / len(sample_values) >= threshold:
                 numeric_columns.append(col)
         
         return numeric_columns
     
     def convert_dataframe_columns(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Convert DataFrame columns with financial data to numeric types"""
-        df_copy = df.copy()
+        """
+        Convert DataFrame columns with financial data to numeric types.
         
+        Args:
+            df (pd.DataFrame): DataFrame to convert columns
+            
+        Returns:
+            pd.DataFrame: DataFrame with numeric columns converted
+        """
+        df_copy = df.copy()
         numeric_columns = self.detect_numeric_columns(df_copy)
         
         for col in numeric_columns:
@@ -168,81 +206,8 @@ class FinancialNumberParser:
         logger.info(f"Converted {len(numeric_columns)} columns to numeric: {numeric_columns}")
         return df_copy
 
-class DataValidator:
-    """Validates financial data quality and consistency"""
-    
-    def __init__(self):
-        self.parser = FinancialNumberParser()
-    
-    def validate_table_data(self, df: pd.DataFrame) -> dict:
-        """Comprehensive validation of table data quality"""
-        if df.empty:
-            return {
-                'is_valid': False,
-                'issues': ['Empty DataFrame'],
-                'metrics': {}
-            }
-        
-        issues = []
-        metrics = {}
-        
-        # Basic structure validation
-        metrics['total_cells'] = df.size
-        metrics['total_rows'] = len(df)
-        metrics['total_columns'] = len(df.columns)
-        
-        # Missing data analysis
-        null_count = df.isnull().sum().sum()
-        metrics['missing_data_percentage'] = (null_count / df.size * 100) if df.size > 0 else 0
-        
-        if metrics['missing_data_percentage'] > 80:
-            issues.append(f"High missing data: {metrics['missing_data_percentage']:.1f}%")
-        
-        # Content validation
-        non_empty_cells = df.count().sum()
-        metrics['content_density'] = (non_empty_cells / df.size * 100) if df.size > 0 else 0
-        
-        # Numeric data validation
-        numeric_columns = self.parser.detect_numeric_columns(df)
-        metrics['numeric_columns'] = len(numeric_columns)
-        metrics['numeric_percentage'] = (len(numeric_columns) / len(df.columns) * 100) if df.columns.size > 0 else 0
-        
-        # Header validation
-        metrics['has_descriptive_headers'] = self._has_descriptive_headers(df.columns.tolist())
-        
-        # Determine overall validity
-        is_valid = (
-            metrics['content_density'] >= 20 and  # At least 20% content
-            metrics['missing_data_percentage'] <= 90 and  # Not too sparse
-            len(df) >= 1 and  # Has at least one row
-            len(df.columns) >= 2  # Has at least two columns
-        )
-        
-        return {
-            'is_valid': is_valid,
-            'issues': issues,
-            'metrics': metrics
-        }
-    
-    def _has_descriptive_headers(self, headers: List[str]) -> bool:
-        """Check if headers contain descriptive financial terms"""
-        financial_terms = [
-            'revenue', 'income', 'cash', 'assets', 'liabilities', 'equity',
-            'sales', 'expenses', 'cost', 'margin', 'profit', 'loss',
-            'quarter', 'year', 'period', 'ended', 'total', 'net'
-        ]
-        
-        descriptive_count = 0
-        for header in headers:
-            if header and isinstance(header, str):
-                header_lower = header.lower()
-                if any(term in header_lower for term in financial_terms):
-                    descriptive_count += 1
-        
-        return descriptive_count > 0 and descriptive_count >= len(headers) * 0.3
-
-class HeaderProcessor:
-    """Processes and improves table headers"""
+class HeaderProcessingService:
+    """Service for processing and identifying table headers"""
     
     def __init__(self):
         self.financial_keywords = [
@@ -250,10 +215,19 @@ class HeaderProcessor:
             'sales', 'expenses', 'cost', 'margin', 'profit', 'loss',
             'quarter', 'year', 'period', 'ended', 'total', 'net'
         ]
-        self.parser = FinancialNumberParser()
+        self.parser = FinancialNumberParsingService()
+        logger.info("Header processing service initialized")
     
-    def identify_header_row(self, table: List[List[str]]) -> tuple[int, List[str]]:
-        """Intelligently identify the header row in a table"""
+    def identify_header_row(self, table: TableData) -> Tuple[int, HeaderRow]:
+        """
+        Intelligently identify the header row in a table.
+        
+        Args:
+            table (TableData): Table data to identify header row
+            
+        Returns:
+            Tuple[int, HeaderRow]: Tuple of header row index and header row data
+        """
         if not table or len(table) < 1:
             return 0, []
         
@@ -285,7 +259,15 @@ class HeaderProcessor:
         return header_idx, self._clean_headers(header_row)
     
     def _score_header_row(self, row: List[str]) -> float:
-        """Score a row based on its likelihood of being headers"""
+        """
+        Score a row based on its likelihood of being headers.
+        
+        Args:
+            row (List[str]): Row to score
+            
+        Returns:
+            float: Score of row
+        """
         if not row:
             return -10
         
@@ -305,7 +287,7 @@ class HeaderProcessor:
             if any(keyword in cell_clean for keyword in self.financial_keywords):
                 descriptive_cells += 1
                 text_cells += 1
-            # Check for pure currency symbols (likely not headers)
+            # Check for pure currency symbols
             elif cell_clean in ['$', '€', '£', '¥'] or re.match(r'^[\$€£¥]?[\d,]+$', cell_clean):
                 currency_cells += 1
             # Check for financial numbers
@@ -329,8 +311,16 @@ class HeaderProcessor:
         
         return score
     
-    def _clean_headers(self, headers: List[str]) -> List[str]:
-        """Clean and standardize header names"""
+    def _clean_headers(self, headers: List[str]) -> HeaderRow:
+        """
+        Clean and standardize header names.
+        
+        Args:
+            headers (List[str]): List of header names
+            
+        Returns:
+            HeaderRow: Cleaned header names
+        """
         cleaned_headers = []
         
         for i, header in enumerate(headers):
@@ -346,3 +336,52 @@ class HeaderProcessor:
                 cleaned_headers.append(f"Column_{i+1}")
         
         return cleaned_headers
+
+class DataFrameService:
+    """Service for creating and managing pandas DataFrames"""
+    
+    def __init__(self):
+        self.parser = FinancialNumberParsingService()
+        logger.info("DataFrame service initialized")
+    
+    def create_dataframe(self, headers: HeaderRow, data_rows: TableData) -> pd.DataFrame:
+        """
+        Create pandas DataFrame from headers and data rows.
+        
+        Args:
+            headers (HeaderRow): List of header names
+            data_rows (TableData): List of data rows
+            
+        Returns:
+            pd.DataFrame: Created DataFrame
+        """
+        if not data_rows:
+            return pd.DataFrame()
+        
+        # Ensure consistent column count
+        max_cols = max(len(headers), max(len(row) for row in data_rows) if data_rows else 0)
+        
+        # Pad headers if needed
+        headers_padded = headers[:]
+        while len(headers_padded) < max_cols:
+            headers_padded.append(f"Column_{len(headers_padded) + 1}")
+        
+        # Pad data rows if needed
+        padded_rows = []
+        for row in data_rows:
+            padded_row = row[:]
+            while len(padded_row) < max_cols:
+                padded_row.append('')
+            padded_rows.append(padded_row[:max_cols])  # Trim if too long
+        
+        df = pd.DataFrame(padded_rows, columns=headers_padded[:max_cols])
+        
+        # Clean DataFrame
+        df = df.replace('', pd.NA)
+        df = df.dropna(how='all')  # Remove completely empty rows
+        
+        # Convert financial columns
+        df = self.parser.convert_dataframe_columns(df)
+        
+        logger.debug(f"Created DataFrame: {len(df)} rows × {len(df.columns)} columns")
+        return df

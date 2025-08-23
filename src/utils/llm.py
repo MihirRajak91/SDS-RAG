@@ -1,1 +1,0 @@
-# Gemini API integration for LLM responses

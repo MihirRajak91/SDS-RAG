@@ -1,1 +1,0 @@
-# Text embedding using MiniLM model
