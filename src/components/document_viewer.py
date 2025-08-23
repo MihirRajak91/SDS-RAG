@@ -1,0 +1,1 @@
+# Document display and management component
