@@ -1,1 +1,1 @@
-# Make tests a package
+"""Tests package for SDS-RAG system."""

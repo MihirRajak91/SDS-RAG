@@ -13,8 +13,13 @@ from src.sds_rag.core.document_processor import DocumentProcessingOrchestrator
 from src.sds_rag.services.embedding_service import EmbeddingService
 from src.sds_rag.services.vector_storage_service import VectorStorageService
 from src.sds_rag.models.schemas import ProcessedDocument
+from src.sds_rag.utils import (
+    find_pdf_files, validate_pdf_file, Timer,
+    StructuredLogger, log_performance
+)
 
 logger = logging.getLogger(__name__)
+structured_logger = StructuredLogger(__name__)
 
 
 class RAGService:
@@ -40,7 +45,7 @@ class RAGService:
             host=qdrant_host,
             port=qdrant_port
         )
-        logger.info("RAG service initialized with all components")
+        logger.info(f"RAG service initialized: embedding_model={embedding_model}, qdrant={qdrant_host}:{qdrant_port}")
     
     def process_and_store_document(self, pdf_path: str) -> Dict[str, Any]:
         """
@@ -214,7 +219,7 @@ class RAGService:
         if not pdf_dir.exists():
             raise ValueError(f"Directory does not exist: {pdf_directory}")
         
-        pdf_files = list(pdf_dir.glob("*.pdf"))
+        pdf_files = find_pdf_files(pdf_directory)
         logger.info(f"Found {len(pdf_files)} PDF files in {pdf_directory}")
         
         results = []

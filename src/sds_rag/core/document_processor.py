@@ -35,6 +35,8 @@ import warnings
 from typing import List, Dict, Any
 from pathlib import Path
 
+from ..utils import StructuredLogger, Timer, log_performance, validate_pdf_file
+
 # Import all services
 from src.sds_rag.services.extraction_service import TableExtractionService, TableCleaningService
 from src.sds_rag.services.parsing_service import (
@@ -56,6 +58,7 @@ from src.sds_rag.models.schemas import (
 # Configure logging and warnings
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+structured_logger = StructuredLogger(__name__)
 warnings.filterwarnings("ignore", category=UserWarning, module="pdfplumber")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="pdfplumber")
 
@@ -78,6 +81,7 @@ class DocumentProcessingOrchestrator:
         
         logger.info("Document processing orchestrator initialized with all microservices")
     
+    @log_performance
     def process_document(self, pdf_path: str) -> ProcessedDocument:
         """
         Process PDF document through complete pipeline.
@@ -88,33 +92,68 @@ class DocumentProcessingOrchestrator:
         Returns:
             ProcessedDocument: Processed document with tables, text, and metadata
         """
-        logger.info(f"Starting document processing pipeline: {pdf_path}")
+        # Validate PDF file first
+        is_valid, validation_errors = validate_pdf_file(pdf_path)
+        if not is_valid:
+            raise ValueError(f"Invalid PDF file: {', '.join(validation_errors)}")
+        
+        structured_logger.log_document_processing(
+            file_path=pdf_path,
+            status="started",
+            details={"pipeline": "document_processing"}
+        )
         
         try:
-            # Step 1: Extract and process tables
-            tables = self._process_tables_pipeline(pdf_path)
-            
-            # Step 2: Extract text content
-            text_chunks = self._process_text_pipeline(pdf_path)
-            
-            # Step 3: Generate document metadata
-            metadata = self._generate_document_metadata(pdf_path)
-            
-            # Step 4: Calculate extraction statistics
-            stats = self._calculate_extraction_statistics(pdf_path, tables, text_chunks)
-            
-            # Step 5: Create final document
-            document = ProcessedDocument(
-                structured_tables=tables,
-                text_chunks=text_chunks,
-                metadata=metadata,
-                extraction_stats=stats
-            )
-            
-            logger.info(f"Processing complete: {len(tables)} tables, {len(text_chunks)} text chunks")
-            return document
+            with Timer(f"Processing document {Path(pdf_path).name}") as timer:
+                # Step 1: Extract and process tables
+                tables = self._process_tables_pipeline(pdf_path)
+                
+                # Step 2: Extract text content
+                text_chunks = self._process_text_pipeline(pdf_path)
+                
+                # Step 3: Generate document metadata
+                metadata = self._generate_document_metadata(pdf_path)
+                
+                # Step 4: Calculate extraction statistics
+                stats = self._calculate_extraction_statistics(pdf_path, tables, text_chunks)
+                
+                # Step 5: Create final document
+                document = ProcessedDocument(
+                    structured_tables=tables,
+                    text_chunks=text_chunks,
+                    metadata=metadata,
+                    extraction_stats=stats
+                )
+                
+                # Generate summary
+                summary = {
+                    "file_path": pdf_path,
+                    "file_name": metadata.file_name,
+                    "processing_successful": True,
+                    "tables_processed": len(tables),
+                    "text_chunks_processed": len(text_chunks),
+                    "high_confidence_tables": len([t for t in tables if t.confidence_level.value == "high"]),
+                    "average_confidence": stats.average_confidence,
+                    "success_rate": stats.success_rate,
+                    "total_pages": stats.total_pages,
+                    "processing_time": timer.elapsed_human
+                }
+                
+                structured_logger.log_document_processing(
+                    file_path=pdf_path,
+                    status="success",
+                    details=summary
+                )
+                
+                logger.info(f"Processing complete: {len(tables)} tables, {len(text_chunks)} text chunks")
+                return document
             
         except Exception as e:
+            structured_logger.log_document_processing(
+                file_path=pdf_path,
+                status="failed",
+                details={"error": str(e)}
+            )
             logger.error(f"Error processing document {pdf_path}: {str(e)}")
             raise
     
@@ -292,7 +331,7 @@ class DocumentProcessingOrchestrator:
             'file_path': pdf_path,
             'file_name': Path(pdf_path).name,
             'extraction_method': 'Microservice Architecture v2.0',
-            'processing_timestamp': pd.Timestamp.now().isoformat(),
+            'processing_timestamp': structured_logger.utc_now_iso(),
             'processor_version': '2.0.0-microservice',
             'total_pages': 0,
             'pdf_metadata': {}
@@ -400,7 +439,7 @@ class DocumentProcessingOrchestrator:
             'business_validation': {
                 'issues': business_issues
             },
-            'extraction_timestamp': pd.Timestamp.now().isoformat(),
+            'extraction_timestamp': structured_logger.utc_now_iso(),
             'data_quality': {
                 'missing_data_percentage': (df.isnull().sum().sum() / df.size * 100) if df.size > 0 else 0,
                 'content_density': (df.count().sum() / df.size * 100) if df.size > 0 else 0

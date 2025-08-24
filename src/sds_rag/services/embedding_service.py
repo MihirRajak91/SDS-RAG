@@ -11,8 +11,10 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema import Document
 
 from src.sds_rag.models.schemas import ProcessedDocument, ProcessedTable, TextChunk
+from src.sds_rag.utils import StructuredLogger, Timer, log_performance
 
 logger = logging.getLogger(__name__)
+structured_logger = StructuredLogger(__name__)
 
 
 class EmbeddingService:
@@ -26,13 +28,20 @@ class EmbeddingService:
             model_name (str): HuggingFace model name for embeddings
         """
         self.model_name = model_name
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name=model_name,
-            model_kwargs={'device': 'cpu'},
-            encode_kwargs={'normalize_embeddings': True}
+        with Timer(f"Loading embedding model {model_name}") as timer:
+            self.embeddings = HuggingFaceEmbeddings(
+                model_name=model_name,
+                model_kwargs={'device': 'cpu'},
+                encode_kwargs={'normalize_embeddings': True}
+            )
+        
+        structured_logger.log_component_init(
+            component="EmbeddingService",
+            config={"model_name": model_name, "load_time": timer.elapsed_human}
         )
         logger.info(f"Embedding service initialized with model: {model_name}")
     
+    @log_performance
     def embed_document(self, document: ProcessedDocument) -> List[Document]:
         """
         Create embeddings for entire processed document.
@@ -43,17 +52,26 @@ class EmbeddingService:
         Returns:
             List[Document]: List of LangChain documents with embeddings
         """
-        langchain_docs = []
+        with Timer(f"Embedding document {document.metadata.file_name}") as timer:
+            langchain_docs = []
+            
+            # Process tables
+            for table in document.structured_tables:
+                table_docs = self._embed_table(table, document.metadata.file_name)
+                langchain_docs.extend(table_docs)
+            
+            # Process text chunks
+            for chunk in document.text_chunks:
+                text_doc = self._embed_text_chunk(chunk, document.metadata.file_name)
+                langchain_docs.append(text_doc)
         
-        # Process tables
-        for table in document.structured_tables:
-            table_docs = self._embed_table(table, document.metadata.file_name)
-            langchain_docs.extend(table_docs)
-        
-        # Process text chunks
-        for chunk in document.text_chunks:
-            text_doc = self._embed_text_chunk(chunk, document.metadata.file_name)
-            langchain_docs.append(text_doc)
+        structured_logger.log_embedding_operation(
+            file_name=document.metadata.file_name,
+            documents_created=len(langchain_docs),
+            tables_processed=len(document.structured_tables),
+            text_chunks_processed=len(document.text_chunks),
+            processing_time=timer.elapsed_human
+        )
         
         logger.info(f"Created {len(langchain_docs)} embedded documents from {document.metadata.file_name}")
         return langchain_docs
@@ -201,6 +219,7 @@ class EmbeddingService:
         
         return ", ".join(row_parts)
     
+    @log_performance
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
         """
         Generate embeddings for list of texts.
@@ -211,7 +230,16 @@ class EmbeddingService:
         Returns:
             List[List[float]]: List of embedding vectors
         """
-        return self.embeddings.embed_documents(texts)
+        with Timer(f"Embedding {len(texts)} texts") as timer:
+            embeddings = self.embeddings.embed_documents(texts)
+        
+        structured_logger.log_embedding_operation(
+            operation="batch_embed",
+            text_count=len(texts),
+            processing_time=timer.elapsed_human
+        )
+        
+        return embeddings
     
     def embed_query(self, query: str) -> List[float]:
         """

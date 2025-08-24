@@ -8,10 +8,12 @@ to provide intelligent responses about financial documents.
 import logging
 from typing import List, Dict, Any, Optional
 
-from sds_rag.services.rag_service import RAGService
-from sds_rag.services.llm_service import LLMService
+from src.sds_rag.services.rag_service import RAGService
+from src.sds_rag.services.llm_service import LLMService
+from src.sds_rag.utils import StructuredLogger, Timer, log_performance, validate_query
 
 logger = logging.getLogger(__name__)
+structured_logger = StructuredLogger(__name__)
 
 
 class ChatService:
@@ -33,15 +35,26 @@ class ChatService:
             qdrant_port (int): Qdrant server port
             embedding_model (str): HuggingFace embedding model
         """
-        self.rag_service = RAGService(
-            qdrant_host=qdrant_host,
-            qdrant_port=qdrant_port,
-            embedding_model=embedding_model
-        )
-        self.llm_service = LLMService(api_key=google_api_key)
+        with Timer("Initializing chat service components") as timer:
+            self.rag_service = RAGService(
+                qdrant_host=qdrant_host,
+                qdrant_port=qdrant_port,
+                embedding_model=embedding_model
+            )
+            self.llm_service = LLMService(api_key=google_api_key)
         
+        structured_logger.log_component_init(
+            component="ChatService",
+            config={
+                "qdrant_host": qdrant_host,
+                "qdrant_port": qdrant_port,
+                "embedding_model": embedding_model,
+                "init_time": timer.elapsed_human
+            }
+        )
         logger.info("Chat service initialized with RAG and LLM components")
     
+    @log_performance
     def chat(
         self,
         user_query: str,
@@ -65,8 +78,29 @@ class ChatService:
         Returns:
             Dict[str, Any]: Complete response with answer and context
         """
+        # Validate query
+        is_valid, validation_errors = validate_query(user_query)
+        if not is_valid:
+            return {
+                "query": user_query,
+                "response": f"Invalid query: {', '.join(validation_errors)}",
+                "sources_found": 0,
+                "context_documents": [],
+                "success": False,
+                "error": "Query validation failed"
+            }
+        
         try:
-            logger.info(f"Processing chat query: {user_query[:50]}...")
+            with Timer(f"Processing chat query") as timer:
+                structured_logger.log_chat_query(
+                    query=user_query[:100],
+                    filters={
+                        "content_type": content_type,
+                        "table_type": table_type,
+                        "source_file": source_file,
+                        "min_confidence": min_confidence
+                    }
+                )
             
             # Step 1: Retrieve relevant documents
             retrieved_docs = self.rag_service.search_financial_data(
@@ -88,22 +122,41 @@ class ChatService:
             else:
                 response_text = self._generate_no_context_response(user_query)
             
-            # Step 3: Format complete response
-            return {
-                "query": user_query,
-                "response": response_text,
-                "sources_found": len(retrieved_docs),
-                "context_documents": retrieved_docs,
-                "filters_applied": {
-                    "content_type": content_type,
-                    "table_type": table_type,
-                    "source_file": source_file,
-                    "min_confidence": min_confidence
-                },
-                "success": True
-            }
+                # Step 3: Format complete response
+                response = {
+                    "query": user_query,
+                    "response": response_text,
+                    "sources_found": len(retrieved_docs),
+                    "context_documents": retrieved_docs,
+                    "filters_applied": {
+                        "content_type": content_type,
+                        "table_type": table_type,
+                        "source_file": source_file,
+                        "min_confidence": min_confidence
+                    },
+                    "processing_time": timer.elapsed_human,
+                    "success": True
+                }
+                
+                structured_logger.log_chat_response(
+                    query=user_query[:100],
+                    sources_found=len(retrieved_docs),
+                    response_length=len(response_text),
+                    processing_time=timer.elapsed_human,
+                    success=True
+                )
+                
+                return response
             
         except Exception as e:
+            structured_logger.log_chat_response(
+                query=user_query[:100],
+                sources_found=0,
+                response_length=0,
+                processing_time="0s",
+                success=False,
+                error=str(e)
+            )
             logger.error(f"Error in chat processing: {e}")
             return {
                 "query": user_query,

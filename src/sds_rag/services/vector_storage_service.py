@@ -16,8 +16,10 @@ from langchain.schema import Document
 import uuid
 
 from src.sds_rag.services.embedding_service import EmbeddingService
+from src.sds_rag.utils import StructuredLogger, Timer, log_performance
 
 logger = logging.getLogger(__name__)
+structured_logger = StructuredLogger(__name__)
 
 
 class VectorStorageService:
