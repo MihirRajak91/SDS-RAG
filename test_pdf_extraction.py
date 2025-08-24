@@ -10,7 +10,9 @@ project_root = Path(__file__).parent
 sys.path.append(str(project_root))
 
 from src.core.document_processor import process_financial_pdf
+from src.services.chat_service import ChatService
 import traceback
+import os
 
 def test_apple_pdf():
     """Enhanced test with improved extraction quality analysis"""
@@ -96,6 +98,44 @@ def test_apple_pdf():
         print(f"\n✅ EXTRACTION COMPLETE")
         print(f"   Overall Quality: {'Excellent' if success_rate > 80 else 'Good' if success_rate > 60 else 'Fair'}")
         print(f"   Ready for RAG processing: {'Yes' if len(high_confidence_tables) > 10 else 'Partial'}")
+        
+        # Test RAG chatbot if API key is available
+        api_key = os.getenv("GOOGLE_AI_API_KEY")
+        if api_key and len(high_confidence_tables) > 0:
+            print(f"\n🤖 TESTING RAG CHATBOT:")
+            try:
+                from src.services.rag_service import RAGService
+                
+                # Process and store in vector DB
+                print(f"   Processing document for RAG...")
+                rag_service = RAGService()
+                rag_result = rag_service.process_and_store_document(pdf_path)
+                
+                if rag_result["processing_successful"]:
+                    print(f"   ✅ Stored {rag_result['vector_points_stored']} vectors in database")
+                    
+                    # Test chatbot
+                    chat_service = ChatService(google_api_key=api_key)
+                    
+                    test_query = "What was Apple's revenue in Q3 2022?"
+                    print(f"   🤖 Test query: '{test_query}'")
+                    
+                    response = chat_service.chat(test_query, num_results=3)
+                    
+                    if response["success"] and response["sources_found"] > 0:
+                        print(f"   ✅ Chatbot response: {response['response'][:200]}...")
+                        print(f"   📚 Found {response['sources_found']} relevant sources")
+                        print(f"   🎯 RAG pipeline fully functional!")
+                    else:
+                        print(f"   ⚠️  Chatbot test completed but no sources found")
+                else:
+                    print(f"   ❌ RAG processing failed: {rag_result.get('error', 'Unknown error')}")
+                    
+            except Exception as e:
+                print(f"   ❌ RAG test failed: {e}")
+        elif not api_key:
+            print(f"\n💡 RAG CHATBOT AVAILABLE:")
+            print(f"   Set GOOGLE_AI_API_KEY environment variable to test the chatbot")
         
         return "SUCCESS: Enhanced PDF processing completed!"
         
