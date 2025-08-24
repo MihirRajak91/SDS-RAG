@@ -176,6 +176,11 @@ class StructuredLogger:
     
     def __init__(self, name: str):
         self.logger = logging.getLogger(name)
+
+    def log_app_startup(self, host: str, port: int, debug: bool, command: str):
+        """Log application startup event."""
+        message = f"App Startup | Host: {host} | Port: {port} | Debug: {debug} | Command: '{command}'"
+        self.logger.info(message)
     
     def log_document_processing(self, 
                               file_path: str, 
@@ -234,6 +239,35 @@ class StructuredLogger:
                            execution_time: float):
         """Log chat interaction events."""
         message = f"Chat | Query: '{query[:50]}...' | Response: {response_length} chars | Sources: {sources_used} | Time: {execution_time:.3f}s"
+        self.logger.info(message)
+    
+    def log_component_init(self, component: str, config: Dict[str, Any]):
+        """Log component initialization."""
+        config_str = " | ".join([f"{k}: {v}" for k, v in config.items()])
+        message = f"Component Init | {component} | {config_str}"
+        self.logger.info(message)
+    
+    def log_chat_query(self, query: str, **kwargs):
+        """Log chat query."""
+        details = " | ".join([f"{k}: {v}" for k, v in kwargs.items()])
+        message = f"Chat Query | '{query}'"
+        if details:
+            message += f" | {details}"
+        self.logger.info(message)
+    
+    def log_chat_response(self, response: str, sources_found: int = 0, execution_time: float = 0.0, **kwargs):
+        """Log chat response."""
+        message = f"Chat Response | Length: {len(response)} chars | Sources: {sources_found}"
+        if execution_time > 0:
+            message += f" | Time: {execution_time:.3f}s"
+        for k, v in kwargs.items():
+            message += f" | {k}: {v}"
+        self.logger.info(message)
+    
+    def log_embedding_operation(self, **kwargs):
+        """Log embedding operation."""
+        details = " | ".join([f"{k}: {v}" for k, v in kwargs.items()])
+        message = f"Embedding Operation | {details}"
         self.logger.info(message)
 
 

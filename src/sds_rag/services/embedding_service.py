@@ -8,7 +8,7 @@ Supports different embedding models and handles content preprocessing.
 import logging
 from typing import List, Dict, Any, Optional
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from src.sds_rag.models.schemas import ProcessedDocument, ProcessedTable, TextChunk
 from src.sds_rag.utils import StructuredLogger, Timer, log_performance

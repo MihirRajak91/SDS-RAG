@@ -32,11 +32,33 @@ class LegacyConfig:
     
     @property
     def embedding(self):
-        return self._settings.embedding
+        # Create a wrapper that provides backward compatibility
+        class EmbeddingWrapper:
+            def __init__(self, embedding_settings):
+                self._settings = embedding_settings
+            
+            def __getattr__(self, name):
+                if name == 'model_name':
+                    # Backward compatibility: model_name -> embedding_model_name
+                    return self._settings.embedding_model_name
+                return getattr(self._settings, name)
+        
+        return EmbeddingWrapper(self._settings.embedding)
     
     @property
     def llm(self):
-        return self._settings.llm
+        # Create a wrapper that provides backward compatibility
+        class LLMWrapper:
+            def __init__(self, llm_settings):
+                self._settings = llm_settings
+            
+            def __getattr__(self, name):
+                if name == 'model_name':
+                    # Backward compatibility: model_name -> llm_model_name
+                    return self._settings.llm_model_name
+                return getattr(self._settings, name)
+        
+        return LLMWrapper(self._settings.llm)
     
     @property
     def streamlit(self):

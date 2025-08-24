@@ -1,5 +1,5 @@
 # SDS-RAG: Simple Document Search with RAG
-
+poetry run streamlit run src/app.py
 A streamlined RAG (Retrieval Augmented Generation) application built with:
 - **Frontend**: Streamlit
 - **LLM**: Google Gemini API

@@ -15,7 +15,7 @@ from typing import Optional
 import argparse
 
 # Add project root to Python path
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from src.sds_rag.utils import StructuredLogger
@@ -28,16 +28,24 @@ structured_logger = StructuredLogger(__name__)
 def check_dependencies():
     """Check if all required dependencies are installed."""
     
-    required_packages = [
-        'streamlit', 'langchain', 'qdrant-client', 'sentence-transformers',
-        'google-generativeai', 'pandas', 'numpy', 'pdfplumber', 'pypdf2'
-    ]
+    # Mapping from package name to import name
+    required_packages = {
+        'streamlit': 'streamlit',
+        'langchain': 'langchain',
+        'qdrant-client': 'qdrant_client',
+        'sentence-transformers': 'sentence_transformers',
+        'google-generativeai': 'google.generativeai',
+        'pandas': 'pandas',
+        'numpy': 'numpy',
+        'pdfplumber': 'pdfplumber',
+        'pypdf2': 'PyPDF2'  # Note the case difference
+    }
     
     missing_packages = []
     
-    for package in required_packages:
+    for package, import_name in required_packages.items():
         try:
-            __import__(package.replace('-', '_'))
+            __import__(import_name)
         except ImportError:
             missing_packages.append(package)
     
@@ -137,6 +145,8 @@ def run_health_checks() -> bool:
         logger.info("✅ Core services import successfully")
     except Exception as e:
         logger.error(f"❌ Core services import failed: {e}")
+        import traceback
+        traceback.print_exc()
         return False
     
     logger.info("✅ All health checks passed")
@@ -148,7 +158,7 @@ def start_streamlit_app(port: int = 8501, host: str = "localhost", debug: bool =
     # Streamlit command
     cmd = [
         sys.executable, "-m", "streamlit", "run", 
-        "app.py",
+        "src/app.py",
         "--server.port", str(port),
         "--server.address", host,
         "--server.headless", "true" if not debug else "false",

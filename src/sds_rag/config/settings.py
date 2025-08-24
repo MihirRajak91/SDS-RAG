@@ -10,7 +10,12 @@ import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Any
 from dataclasses import dataclass
-from pydantic import BaseSettings, validator, Field
+try:
+    from pydantic_settings import BaseSettings
+    from pydantic import validator, Field
+except ImportError:
+    # Fallback for older pydantic versions
+    from pydantic import BaseSettings, validator, Field
 from dotenv import load_dotenv
 
 from .constants import (
@@ -68,19 +73,20 @@ class QdrantSettings(BaseSettings):
     
     class Config:
         env_prefix = "QDRANT_"
+        extra = "ignore"  # Allow extra environment variables
 
 
 class EmbeddingSettings(BaseSettings):
     """Embedding model configuration."""
     
-    model_name: str = Field(default=DEFAULT_EMBEDDING_MODEL, description="HuggingFace embedding model name")
+    embedding_model_name: str = Field(default=DEFAULT_EMBEDDING_MODEL, description="HuggingFace embedding model name")
     device: str = Field(default="cpu", description="Device for embedding model (cpu/cuda)")
     normalize_embeddings: bool = Field(default=True, description="Whether to normalize embeddings")
     batch_size: int = Field(default=32, ge=1, le=128, description="Batch size for embedding generation")
     max_length: int = Field(default=512, ge=128, le=2048, description="Maximum sequence length")
     
-    @validator('model_name')
-    def validate_model_name(cls, v):
+    @validator('embedding_model_name')
+    def validate_embedding_model_name(cls, v):
         if v not in SUPPORTED_EMBEDDING_MODELS:
             logger.warning(f"Embedding model '{v}' not in supported list. Proceeding anyway.")
         return v
@@ -94,13 +100,15 @@ class EmbeddingSettings(BaseSettings):
     
     class Config:
         env_prefix = "EMBEDDING_"
+        extra = "ignore"
+        protected_namespaces = ()
 
 
 class LLMSettings(BaseSettings):
     """Large Language Model configuration."""
     
     google_api_key: Optional[str] = Field(default=None, description="Google AI API key")
-    model_name: str = Field(default=DEFAULT_LLM_MODEL, description="LLM model name")
+    llm_model_name: str = Field(default=DEFAULT_LLM_MODEL, description="LLM model name")
     temperature: float = Field(default=DEFAULT_LLM_TEMPERATURE, ge=0.0, le=2.0, description="Generation temperature")
     max_tokens: int = Field(default=DEFAULT_MAX_TOKENS, ge=1, le=8192, description="Maximum output tokens")
     timeout: float = Field(default=TIMEOUTS["LLM_REQUEST"], ge=5.0, description="Request timeout in seconds")
@@ -124,6 +132,8 @@ class LLMSettings(BaseSettings):
     
     class Config:
         env_prefix = "LLM_"
+        extra = "ignore"
+        protected_namespaces = ()
 
 
 class APISettings(BaseSettings):
@@ -145,6 +155,7 @@ class APISettings(BaseSettings):
     
     class Config:
         env_prefix = "API_"
+        extra = "ignore"
 
 
 class StreamlitSettings(BaseSettings):
@@ -182,6 +193,7 @@ class StreamlitSettings(BaseSettings):
     
     class Config:
         env_prefix = "STREAMLIT_"
+        extra = "ignore"
 
 
 class ProcessingSettings(BaseSettings):
@@ -212,6 +224,7 @@ class ProcessingSettings(BaseSettings):
     
     class Config:
         env_prefix = "PROCESSING_"
+        extra = "ignore"
 
 
 class LoggingSettings(BaseSettings):
@@ -242,6 +255,7 @@ class LoggingSettings(BaseSettings):
     
     class Config:
         env_prefix = "LOG_"
+        extra = "ignore"
 
 
 class SecuritySettings(BaseSettings):
@@ -256,6 +270,7 @@ class SecuritySettings(BaseSettings):
     
     class Config:
         env_prefix = "SECURITY_"
+        extra = "ignore"
 
 
 class PerformanceSettings(BaseSettings):
@@ -275,6 +290,7 @@ class PerformanceSettings(BaseSettings):
     
     class Config:
         env_prefix = "PERFORMANCE_"
+        extra = "ignore"
 
 
 class AppSettings(BaseSettings):
@@ -325,10 +341,10 @@ class AppSettings(BaseSettings):
             errors.append(f"Port conflicts detected for: {', '.join(duplicates)}")
         
         # Validate embedding model compatibility
-        if self.embedding.model_name in SUPPORTED_EMBEDDING_MODELS:
-            expected_size = SUPPORTED_EMBEDDING_MODELS[self.embedding.model_name]
+        if self.embedding.embedding_model_name in SUPPORTED_EMBEDDING_MODELS:
+            expected_size = SUPPORTED_EMBEDDING_MODELS[self.embedding.embedding_model_name]
             if self.qdrant.vector_size != expected_size:
-                errors.append(f"Vector size mismatch: {self.embedding.model_name} "
+                errors.append(f"Vector size mismatch: {self.embedding.embedding_model_name} "
                             f"produces {expected_size}D vectors, but Qdrant is configured for {self.qdrant.vector_size}D")
         
         if errors:
@@ -375,6 +391,8 @@ class AppSettings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = False
+        extra = "ignore"
+        protected_namespaces = ()
 
 
 # =============================================================================
@@ -439,12 +457,12 @@ def print_settings_summary(settings: AppSettings):
     print(f"Vector Size: {settings.qdrant.vector_size}")
     print()
     
-    print(f"Embedding Model: {settings.embedding.model_name}")
+    print(f"Embedding Model: {settings.embedding.embedding_model_name}")
     print(f"Device: {settings.embedding.device}")
     print(f"Batch Size: {settings.embedding.batch_size}")
     print()
     
-    print(f"LLM Model: {settings.llm.model_name}")
+    print(f"LLM Model: {settings.llm.llm_model_name}")
     print(f"Temperature: {settings.llm.temperature}")
     print(f"Max Tokens: {settings.llm.max_tokens}")
     print(f"API Key: {settings.llm.google_api_key}")

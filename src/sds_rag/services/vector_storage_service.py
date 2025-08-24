@@ -12,7 +12,7 @@ from qdrant_client.models import (
     VectorParams, Distance, PointStruct, Filter, 
     FieldCondition, MatchValue
 )
-from langchain.schema import Document
+from langchain_core.documents import Document
 import uuid
 
 from src.sds_rag.services.embedding_service import EmbeddingService
@@ -276,7 +276,7 @@ class VectorStorageService:
         try:
             info = self.client.get_collection(self.collection_name)
             return {
-                "name": info.name,
+                "name": self.collection_name,
                 "points_count": info.points_count,
                 "vector_size": info.config.params.vectors.size,
                 "distance": info.config.params.vectors.distance.value

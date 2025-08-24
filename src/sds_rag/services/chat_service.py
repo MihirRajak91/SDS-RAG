@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 
 from src.sds_rag.services.rag_service import RAGService
 from src.sds_rag.services.llm_service import LLMService
-from src.sds_rag.utils import StructuredLogger, Timer, log_performance, validate_query
+from src.sds_rag.utils import StructuredLogger, Timer, log_performance, validate_search_query
 
 logger = logging.getLogger(__name__)
 structured_logger = StructuredLogger(__name__)
@@ -79,7 +79,7 @@ class ChatService:
             Dict[str, Any]: Complete response with answer and context
         """
         # Validate query
-        is_valid, validation_errors = validate_query(user_query)
+        is_valid, validation_errors = validate_search_query(user_query)
         if not is_valid:
             return {
                 "query": user_query,
