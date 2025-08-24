@@ -9,10 +9,10 @@ import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 
-from src.core.document_processor import DocumentProcessingOrchestrator
-from src.services.embedding_service import EmbeddingService
-from src.services.vector_storage_service import VectorStorageService
-from src.models.schemas import ProcessedDocument
+from src.sds_rag.core.document_processor import DocumentProcessingOrchestrator
+from src.sds_rag.services.embedding_service import EmbeddingService
+from src.sds_rag.services.vector_storage_service import VectorStorageService
+from src.sds_rag.models.schemas import ProcessedDocument
 
 logger = logging.getLogger(__name__)
 

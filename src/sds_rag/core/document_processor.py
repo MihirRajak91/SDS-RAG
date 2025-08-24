@@ -36,19 +36,19 @@ from typing import List, Dict, Any
 from pathlib import Path
 
 # Import all services
-from src.services.extraction_service import TableExtractionService, TableCleaningService
-from src.services.parsing_service import (
+from src.sds_rag.services.extraction_service import TableExtractionService, TableCleaningService
+from src.sds_rag.services.parsing_service import (
     FinancialNumberParsingService, HeaderProcessingService, DataFrameService
 )
-from src.services.classification_service import (
+from src.sds_rag.services.classification_service import (
     TableClassificationService, ConfidenceCalculationService
 )
-from src.services.validation_service import (
+from src.sds_rag.services.validation_service import (
     DataValidationService, TableStructureValidationService, BusinessRuleValidationService
 )
 
 # Import models
-from src.models.schemas import (
+from src.sds_rag.models.schemas import (
     ProcessedDocument, ProcessedTable, TextChunk, DocumentMetadata, 
     ExtractionStatistics, ConfidenceLevel
 )

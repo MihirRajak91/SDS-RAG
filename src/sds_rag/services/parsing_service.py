@@ -25,7 +25,7 @@ import logging
 from typing import Union, List, Tuple
 from decimal import Decimal, InvalidOperation
 
-from src.models.schemas import HeaderRow, TableData
+from src.sds_rag.models.schemas import HeaderRow, TableData
 
 logger = logging.getLogger(__name__)
 

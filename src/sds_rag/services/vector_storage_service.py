@@ -10,12 +10,12 @@ from typing import List, Dict, Any, Optional
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     VectorParams, Distance, PointStruct, Filter, 
-    FieldCondition, MatchValue, SearchRequest
+    FieldCondition, MatchValue
 )
 from langchain.schema import Document
 import uuid
 
-from src.services.embedding_service import EmbeddingService
+from src.sds_rag.services.embedding_service import EmbeddingService
 
 logger = logging.getLogger(__name__)
 

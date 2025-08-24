@@ -14,14 +14,14 @@ import os
 from pathlib import Path
 
 # Add src to path
-project_root = Path(__file__).parent
-sys.path.append(str(project_root))
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root / "src"))
 
-from src.services.vector_storage_service import VectorStorageService
-from src.services.llm_service import LLMService
-from src.services.embedding_service import EmbeddingService
-from src.services.chat_service import ChatService
-from src.services.rag_service import RAGService
+from sds_rag.services.vector_storage_service import VectorStorageService
+from sds_rag.services.llm_service import LLMService
+from sds_rag.services.embedding_service import EmbeddingService
+from sds_rag.services.chat_service import ChatService
+from sds_rag.services.rag_service import RAGService
 import traceback
 
 

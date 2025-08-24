@@ -6,10 +6,10 @@ to provide intelligent responses about financial documents.
 """
 
 import logging
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 
-from src.services.rag_service import RAGService
-from src.services.llm_service import LLMService
+from sds_rag.services.rag_service import RAGService
+from sds_rag.services.llm_service import LLMService
 
 logger = logging.getLogger(__name__)
 

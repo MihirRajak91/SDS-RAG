@@ -22,7 +22,7 @@ import pandas as pd
 import logging
 from typing import Dict, List
 
-from src.models.schemas import (
+from src.sds_rag.models.schemas import (
     TableType, TableClassificationResult, ConfidenceMetrics, 
     RawTableData, HeaderRow
 )

@@ -21,7 +21,7 @@ import re
 import logging
 from typing import List, Dict, Any
 
-from src.models.schemas import RawTableData, ExtractionMethod
+from src.sds_rag.models.schemas import RawTableData, ExtractionMethod
 
 logger = logging.getLogger(__name__)
 

@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.schema import Document
 
-from src.models.schemas import ProcessedDocument, ProcessedTable, TextChunk
+from src.sds_rag.models.schemas import ProcessedDocument, ProcessedTable, TextChunk
 
 logger = logging.getLogger(__name__)
 

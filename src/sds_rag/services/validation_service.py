@@ -25,7 +25,7 @@ import pandas as pd
 import logging
 from typing import List
 
-from src.models.schemas import DataValidationResult, TableData, HeaderRow
+from src.sds_rag.models.schemas import DataValidationResult, TableData, HeaderRow
 
 logger = logging.getLogger(__name__)
 
